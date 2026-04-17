@@ -62,13 +62,15 @@
 
         // Cấu hình máy quét
         const html5QrcodeScanner = new Html5QrcodeScanner(
-            "reader", 
-            { 
-                fps: 15, // Số khung hình trên giây (càng cao càng mượt nhưng tốn pin)
-                qrbox: { width: 300, height: 150 }, // Hình chữ nhật quét Barcode
-                aspectRatio: 1.0 // Tỉ lệ khung hình
-            }
-        );
+    "reader", 
+    { 
+        fps: 20, // Tăng tốc độ lấy nét
+        qrbox: { width: 300, height: 150 }, // Khung quét dẹt theo hình dáng Barcode
+        rememberLastUsedCamera: true,
+        // Dòng quan trọng nhất: cho phép quét tất cả các loại mã vạch
+        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
+    }
+);
 
         html5QrcodeScanner.render(onScanSuccess);
     </script>

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scanner Điểm Danh</title>
+    
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .container { width: 90%; max-width: 500px; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h2 { color: #1a73e8; margin-bottom: 20px; }
+        #reader { width: 100%; border-radius: 10px; overflow: hidden; border: none !important; }
+        #result-box { margin-top: 20px; padding: 15px; border: 2px dashed #1a73e8; border-radius: 10px; background: #e8f0fe; }
+        .success-text { color: #188038; font-weight: bold; font-size: 1.2em; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>QUÉT THẺ SINH VIÊN</h2>
+        
+        <div id="reader"></div>
+        
+        <div id="result-box">
+            <p>Trạng thái: <span id="status">Sẵn sàng</span></p>
+            <p>MSSV vừa quét: <span id="scanned-result" class="success-text">---</span></p>
+        </div>
+    </div>
+
+    <script>
+        // Cấu hình URL Web App của bạn từ Bước 1
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwWoMsqMcEAiYiGlsmzZN_ZYsAPep45hxSEj5bryFVUWfbO3rYjKWlv-SXk8XfyDQ6s/exec";
+
+        // Hàm xử lý khi quét thành công
+        function onScanSuccess(decodedText, decodedResult) {
+            // 1. Hiển thị kết quả lên màn hình
+            document.getElementById('scanned-result').innerText = decodedText;
+            document.getElementById('status').innerText = "Đang gửi dữ liệu...";
+
+            // 2. Gửi dữ liệu đi
+            fetch(SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors', // Quan trọng để tránh lỗi CORS khi dùng Google Script
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mssv: decodedText })
+            })
+            .then(() => {
+                document.getElementById('status').innerText = "Đã lưu thành công!";
+                // Tạm dừng 2 giây để người dùng kịp nhìn kết quả trước khi quét người tiếp theo
+                html5QrcodeScanner.pause();
+                setTimeout(() => {
+                    html5QrcodeScanner.resume();
+                    document.getElementById('status').innerText = "Sẵn sàng quét tiếp";
+                }, 2000);
+            })
+            .catch(err => {
+                alert("Lỗi kết nối: " + err);
+            });
+        }
+
+        // Cấu hình máy quét
+        const html5QrcodeScanner = new Html5QrcodeScanner(
+            "reader", 
+            { 
+                fps: 15, // Số khung hình trên giây (càng cao càng mượt nhưng tốn pin)
+                qrbox: { width: 300, height: 150 }, // Hình chữ nhật quét Barcode
+                aspectRatio: 1.0 // Tỉ lệ khung hình
+            }
+        );
+
+        html5QrcodeScanner.render(onScanSuccess);
+    </script>
+</body>
+</html>

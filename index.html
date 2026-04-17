@@ -3,76 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scanner Điểm Danh</title>
-    
+    <title>UEF Scanner - Điểm Danh</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
-    
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-        .container { width: 90%; max-width: 500px; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        h2 { color: #1a73e8; margin-bottom: 20px; }
-        #reader { width: 100%; border-radius: 10px; overflow: hidden; border: none !important; }
-        #result-box { margin-top: 20px; padding: 15px; border: 2px dashed #1a73e8; border-radius: 10px; background: #e8f0fe; }
-        .success-text { color: #188038; font-weight: bold; font-size: 1.2em; }
+        body { font-family: sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .container { width: 100%; max-width: 450px; background: white; padding: 15px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h2 { color: #d32f2f; text-align: center; margin-bottom: 10px; }
+        #reader { width: 100%; border-radius: 10px; overflow: hidden; }
+        #result-box { margin-top: 15px; padding: 10px; background: #e3f2fd; border-radius: 8px; border: 1px solid #2196f3; text-align: center; }
+        .mssv-text { font-size: 1.5em; font-weight: bold; color: #1565c0; display: block; margin-top: 5px; }
+        #status { font-weight: bold; color: #4caf50; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h2>QUÉT THẺ SINH VIÊN</h2>
-        
+        <h2>UEF ĐIỂM DANH</h2>
         <div id="reader"></div>
-        
         <div id="result-box">
-            <p>Trạng thái: <span id="status">Sẵn sàng</span></p>
-            <p>MSSV vừa quét: <span id="scanned-result" class="success-text">---</span></p>
+            <span>Trạng thái: <span id="status">Sẵn sàng</span></span>
+            <span class="mssv-text" id="scanned-result">---</span>
         </div>
     </div>
 
     <script>
-        // Cấu hình URL Web App của bạn từ Bước 1
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwWoMsqMcEAiYiGlsmzZN_ZYsAPep45hxSEj5bryFVUWfbO3rYjKWlv-SXk8XfyDQ6s/exec";
+        // 1. THAY LINK GOOGLE SCRIPT CỦA BẠN VÀO ĐÂY
+        const SCRIPT_URL = "URL_GOOGLE_APPS_SCRIPT_CUA_BAN";
 
-        // Hàm xử lý khi quét thành công
-        function onScanSuccess(decodedText, decodedResult) {
-            // 1. Hiển thị kết quả lên màn hình
-            document.getElementById('scanned-result').innerText = decodedText;
-            document.getElementById('status').innerText = "Đang gửi dữ liệu...";
+        function onScanSuccess(decodedText) {
+            // Dừng quét tạm thời để xử lý dữ liệu
+            html5QrCode.stop().then(() => {
+                document.getElementById('scanned-result').innerText = decodedText;
+                document.getElementById('status').innerText = "Đang gửi...";
+                document.getElementById('status').style.color = "orange";
 
-            // 2. Gửi dữ liệu đi
-            fetch(SCRIPT_URL, {
-                method: 'POST',
-                mode: 'no-cors', // Quan trọng để tránh lỗi CORS khi dùng Google Script
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mssv: decodedText })
-            })
-            .then(() => {
-                document.getElementById('status').innerText = "Đã lưu thành công!";
-                // Tạm dừng 2 giây để người dùng kịp nhìn kết quả trước khi quét người tiếp theo
-                html5QrcodeScanner.pause();
-                setTimeout(() => {
-                    html5QrcodeScanner.resume();
-                    document.getElementById('status').innerText = "Sẵn sàng quét tiếp";
-                }, 2000);
-            })
-            .catch(err => {
-                alert("Lỗi kết nối: " + err);
+                // Gửi dữ liệu tới Google Sheets
+                fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify({ mssv: decodedText })
+                })
+                .then(() => {
+                    document.getElementById('status').innerText = "THÀNH CÔNG!";
+                    document.getElementById('status').style.color = "green";
+                    // Đợi 2 giây rồi khởi động lại camera để quét người tiếp theo
+                    setTimeout(() => { startScanner(); }, 2000);
+                })
+                .catch(err => {
+                    alert("Lỗi gửi dữ liệu: " + err);
+                    startScanner();
+                });
             });
         }
 
-        // Cấu hình máy quét
-        const html5QrcodeScanner = new Html5QrcodeScanner(
-    "reader", 
-    { 
-        fps: 20, // Tăng tốc độ lấy nét
-        qrbox: { width: 300, height: 150 }, // Khung quét dẹt theo hình dáng Barcode
-        rememberLastUsedCamera: true,
-        // Dòng quan trọng nhất: cho phép quét tất cả các loại mã vạch
-        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
-    }
-);
+        const config = { 
+            fps: 20, 
+            qrbox: { width: 320, height: 120 }, // Khung dẹt chuyên dụng cho Barcode
+            aspectRatio: 1.0
+        };
 
-        html5QrcodeScanner.render(onScanSuccess);
+        const html5QrCode = new Html5Qrcode("reader");
+
+        const startScanner = () => {
+            document.getElementById('status').innerText = "Đang tìm mã...";
+            document.getElementById('status').style.color = "green";
+            
+            html5QrCode.start(
+                { facingMode: "environment" }, // Ưu tiên camera sau
+                config,
+                onScanSuccess
+            ).catch(err => {
+                console.error("Không thể mở camera: ", err);
+            });
+        };
+
+        // Bắt đầu chạy
+        startScanner();
     </script>
 </body>
 </html>

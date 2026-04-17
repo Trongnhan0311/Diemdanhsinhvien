@@ -3,82 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UEF Scanner - Điểm Danh</title>
+    <title>UEF Barcode Scanner</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        body { font-family: sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding: 20px; }
-        .container { width: 100%; max-width: 450px; background: white; padding: 15px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        h2 { color: #d32f2f; text-align: center; margin-bottom: 10px; }
-        #reader { width: 100%; border-radius: 10px; overflow: hidden; }
-        #result-box { margin-top: 15px; padding: 10px; background: #e3f2fd; border-radius: 8px; border: 1px solid #2196f3; text-align: center; }
-        .mssv-text { font-size: 1.5em; font-weight: bold; color: #1565c0; display: block; margin-top: 5px; }
-        #status { font-weight: bold; color: #4caf50; }
+        body { font-family: -apple-system, system-ui, sans-serif; background: #1a1a1a; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .container { width: 95%; max-width: 500px; text-align: center; }
+        #reader { width: 100%; border-radius: 20px; overflow: hidden; border: 2px solid #333; background: black; }
+        .info-box { margin-top: 20px; padding: 20px; background: #333; border-radius: 15px; width: 80%; }
+        #scanned-result { font-size: 24px; font-weight: bold; color: #40ff00; display: block; margin: 10px 0; }
+        #status { font-size: 14px; color: #aaa; }
+        .hint { font-size: 12px; color: #888; margin-top: 10px; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h2>UEF ĐIỂM DANH</h2>
+        <h2 style="color: #ff4d4d;">UEF SCANNER</h2>
         <div id="reader"></div>
-        <div id="result-box">
-            <span>Trạng thái: <span id="status">Sẵn sàng</span></span>
-            <span class="mssv-text" id="scanned-result">---</span>
+        
+        <div class="info-box">
+            <span id="status">ĐANG TÌM MÃ VẠCH...</span>
+            <span id="scanned-result">---</span>
         </div>
+        <p class="hint">Mẹo: Để thẻ nằm ngang, cách camera 15cm</p>
     </div>
 
     <script>
         // 1. THAY LINK GOOGLE SCRIPT CỦA BẠN VÀO ĐÂY
-        const SCRIPT_URL = "URL_GOOGLE_APPS_SCRIPT_CUA_BAN";
-
-        function onScanSuccess(decodedText) {
-            // Dừng quét tạm thời để xử lý dữ liệu
-            html5QrCode.stop().then(() => {
-                document.getElementById('scanned-result').innerText = decodedText;
-                document.getElementById('status').innerText = "Đang gửi...";
-                document.getElementById('status').style.color = "orange";
-
-                // Gửi dữ liệu tới Google Sheets
-                fetch(SCRIPT_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    body: JSON.stringify({ mssv: decodedText })
-                })
-                .then(() => {
-                    document.getElementById('status').innerText = "THÀNH CÔNG!";
-                    document.getElementById('status').style.color = "green";
-                    // Đợi 2 giây rồi khởi động lại camera để quét người tiếp theo
-                    setTimeout(() => { startScanner(); }, 2000);
-                })
-                .catch(err => {
-                    alert("Lỗi gửi dữ liệu: " + err);
-                    startScanner();
-                });
-            });
-        }
-
-        const config = { 
-            fps: 20, 
-            qrbox: { width: 320, height: 120 }, // Khung dẹt chuyên dụng cho Barcode
-            aspectRatio: 1.0
-        };
+        const SCRIPT_URL = "URL_CUA_BAN"; 
 
         const html5QrCode = new Html5Qrcode("reader");
+        
+        const config = { 
+            fps: 30, // Tăng tốc độ khung hình
+            qrbox: { width: 320, height: 120 }, // Khung quét dẹt chuẩn Barcode
+            aspectRatio: 1.0,
+            // ÉP BUỘC ĐỌC MÃ VẠCH (CODE 128)
+            formatsToSupport: [ Html5QrcodeSupportedFormats.CODE_128 ]
+        };
 
-        const startScanner = () => {
-            document.getElementById('status').innerText = "Đang tìm mã...";
-            document.getElementById('status').style.color = "green";
+        const onScanSuccess = (decodedText, decodedResult) => {
+            // Rung một cái khi quét trúng (nếu điện thoại hỗ trợ)
+            if (navigator.vibrate) navigator.vibrate(100);
             
-            html5QrCode.start(
-                { facingMode: "environment" }, // Ưu tiên camera sau
-                config,
-                onScanSuccess
-            ).catch(err => {
-                console.error("Không thể mở camera: ", err);
+            document.getElementById('scanned-result').innerText = decodedText;
+            document.getElementById('status').innerText = "ĐANG LƯU VÀO FILE...";
+            
+            // Ngừng quét để gửi dữ liệu
+            html5QrCode.pause(true);
+
+            fetch(SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                body: JSON.stringify({ mssv: decodedText })
+            })
+            .then(() => {
+                document.getElementById('status').innerText = "ĐÃ LƯU THÀNH CÔNG!";
+                setTimeout(() => {
+                    document.getElementById('status').innerText = "QUÉT NGƯỜI TIẾP THEO...";
+                    html5QrCode.resume();
+                }, 2000);
+            })
+            .catch(err => {
+                console.error(err);
+                html5QrCode.resume();
             });
         };
 
-        // Bắt đầu chạy
-        startScanner();
+        // Khởi động camera sau
+        html5QrCode.start(
+            { facingMode: "environment" }, 
+            config, 
+            onScanSuccess
+        ).catch(err => {
+            alert("Lỗi Camera: " + err);
+        });
     </script>
 </body>
 </html>

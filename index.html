@@ -3,76 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scanner Điểm Danh</title>
-    
+    <title>UEF Barcode Scanner</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
-    
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-        .container { width: 90%; max-width: 500px; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        h2 { color: #1a73e8; margin-bottom: 20px; }
-        #reader { width: 100%; border-radius: 10px; overflow: hidden; border: none !important; }
-        #result-box { margin-top: 20px; padding: 15px; border: 2px dashed #1a73e8; border-radius: 10px; background: #e8f0fe; }
-        .success-text { color: #188038; font-weight: bold; font-size: 1.2em; }
+        body { font-family: -apple-system, system-ui, sans-serif; background: #1a1a1a; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .container { width: 95%; max-width: 500px; text-align: center; }
+        #reader { width: 100%; border-radius: 20px; overflow: hidden; border: 2px solid #333; background: black; }
+        .info-box { margin-top: 20px; padding: 20px; background: #333; border-radius: 15px; width: 80%; }
+        #scanned-result { font-size: 24px; font-weight: bold; color: #40ff00; display: block; margin: 10px 0; }
+        #status { font-size: 14px; color: #aaa; }
+        .hint { font-size: 12px; color: #888; margin-top: 10px; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h2>QUÉT THẺ SINH VIÊN</h2>
-        
+        <h2 style="color: #ff4d4d;">UEF SCANNER</h2>
         <div id="reader"></div>
         
-        <div id="result-box">
-            <p>Trạng thái: <span id="status">Sẵn sàng</span></p>
-            <p>MSSV vừa quét: <span id="scanned-result" class="success-text">---</span></p>
+        <div class="info-box">
+            <span id="status">ĐANG TÌM MÃ VẠCH...</span>
+            <span id="scanned-result">---</span>
         </div>
+        <p class="hint">Mẹo: Để thẻ nằm ngang, cách camera 15cm</p>
     </div>
 
     <script>
-        // Cấu hình URL Web App của bạn từ Bước 1
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwWoMsqMcEAiYiGlsmzZN_ZYsAPep45hxSEj5bryFVUWfbO3rYjKWlv-SXk8XfyDQ6s/exec";
+        // 1. THAY LINK GOOGLE SCRIPT CỦA BẠN VÀO ĐÂY
+        const SCRIPT_URL = "URL_CUA_BAN"; 
 
-        // Hàm xử lý khi quét thành công
-        function onScanSuccess(decodedText, decodedResult) {
-            // 1. Hiển thị kết quả lên màn hình
+        const html5QrCode = new Html5Qrcode("reader");
+        
+        const config = { 
+            fps: 30, // Tăng tốc độ khung hình
+            qrbox: { width: 320, height: 120 }, // Khung quét dẹt chuẩn Barcode
+            aspectRatio: 1.0,
+            // ÉP BUỘC ĐỌC MÃ VẠCH (CODE 128)
+            formatsToSupport: [ Html5QrcodeSupportedFormats.CODE_128 ]
+        };
+
+        const onScanSuccess = (decodedText, decodedResult) => {
+            // Rung một cái khi quét trúng (nếu điện thoại hỗ trợ)
+            if (navigator.vibrate) navigator.vibrate(100);
+            
             document.getElementById('scanned-result').innerText = decodedText;
-            document.getElementById('status').innerText = "Đang gửi dữ liệu...";
+            document.getElementById('status').innerText = "ĐANG LƯU VÀO FILE...";
+            
+            // Ngừng quét để gửi dữ liệu
+            html5QrCode.pause(true);
 
-            // 2. Gửi dữ liệu đi
             fetch(SCRIPT_URL, {
                 method: 'POST',
-                mode: 'no-cors', // Quan trọng để tránh lỗi CORS khi dùng Google Script
-                headers: { 'Content-Type': 'application/json' },
+                mode: 'no-cors',
                 body: JSON.stringify({ mssv: decodedText })
             })
             .then(() => {
-                document.getElementById('status').innerText = "Đã lưu thành công!";
-                // Tạm dừng 2 giây để người dùng kịp nhìn kết quả trước khi quét người tiếp theo
-                html5QrcodeScanner.pause();
+                document.getElementById('status').innerText = "ĐÃ LƯU THÀNH CÔNG!";
                 setTimeout(() => {
-                    html5QrcodeScanner.resume();
-                    document.getElementById('status').innerText = "Sẵn sàng quét tiếp";
+                    document.getElementById('status').innerText = "QUÉT NGƯỜI TIẾP THEO...";
+                    html5QrCode.resume();
                 }, 2000);
             })
             .catch(err => {
-                alert("Lỗi kết nối: " + err);
+                console.error(err);
+                html5QrCode.resume();
             });
-        }
+        };
 
-        // Cấu hình máy quét
-        const html5QrcodeScanner = new Html5QrcodeScanner(
-    "reader", 
-    { 
-        fps: 20, // Tăng tốc độ lấy nét
-        qrbox: { width: 300, height: 150 }, // Khung quét dẹt theo hình dáng Barcode
-        rememberLastUsedCamera: true,
-        // Dòng quan trọng nhất: cho phép quét tất cả các loại mã vạch
-        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
-    }
-);
-
-        html5QrcodeScanner.render(onScanSuccess);
+        // Khởi động camera sau
+        html5QrCode.start(
+            { facingMode: "environment" }, 
+            config, 
+            onScanSuccess
+        ).catch(err => {
+            alert("Lỗi Camera: " + err);
+        });
     </script>
 </body>
 </html>
